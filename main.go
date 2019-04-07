@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/fatih/color"
@@ -58,11 +59,22 @@ func main() {
 
 func getResults(addresses ...string) Results {
 	results := Results{}
+	mtx := &sync.Mutex{}
+	wg := &sync.WaitGroup{}
 
 	for _, addr := range addresses {
-		result := exec(addr)
-		results = append(results, result)
+		wg.Add(1)
+
+		go func(address string) {
+			result := exec(address)
+			mtx.Lock()
+			results = append(results, result)
+			mtx.Unlock()
+			wg.Done()
+		}(addr)
 	}
+
+	wg.Wait()
 
 	return results
 }
