@@ -6,7 +6,7 @@ SSL is a simple command line utility to get common information from an SSL/TLS e
 
 ## Releases
 
-Binary releases for common platforms are available on the Github releases tab.
+Binary releases for common platforms are available on the Github [releases](https://github.com/sfreiberg/ssl/releases) page.
 
 ## Example
 
