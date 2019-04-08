@@ -45,6 +45,12 @@ func (r Results) String() {
 
 }
 
+func init() {
+	// Enable TLS 1.3. Disabled by default in go 1.12
+	// See: https://golang.org/pkg/crypto/tls/
+	os.Setenv("GODEBUG", os.Getenv("GODEBUG")+",tls13=1")
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Printf("usage: ssl <address[:port]> ...\n")
