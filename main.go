@@ -130,9 +130,11 @@ func sslVersionS(ver uint16) string {
 	case tls.VersionTLS10:
 		return "TLS 1.0"
 	case tls.VersionTLS11:
-		return "TLS 2.0"
+		return "TLS 1.1"
 	case tls.VersionTLS12:
-		return "TLS 3.0"
+		return "TLS 1.2"
+	case tls.VersionTLS13:
+		return "TLS 1.3"
 	}
 
 	return "Unknown"
