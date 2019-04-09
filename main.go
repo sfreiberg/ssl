@@ -148,6 +148,7 @@ func sslVersionS(ver uint16) string {
 
 func cipherS(cipher uint16) string {
 	switch cipher {
+	// TLS 1.0 - 1.2 cipher suites
 	case tls.TLS_RSA_WITH_RC4_128_SHA:
 		return "RSA/RC4_128/SHA"
 	case tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA:
@@ -192,6 +193,13 @@ func cipherS(cipher uint16) string {
 		return "ECDHE_RSA/CHACHA20/POLY1305"
 	case tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305:
 		return "ECDHE_ECDSA/CHACHA20/POLY1305"
+	// TLS 1.3 cipher suites
+	case tls.TLS_AES_128_GCM_SHA256:
+		return "AES_128_GCM/SHA256"
+	case tls.TLS_AES_256_GCM_SHA384:
+		return "AES_256_GCM/SHA384"
+	case tls.TLS_CHACHA20_POLY1305_SHA256:
+		return "CHACHA20/POLY1305/SHA256"
 	}
 
 	return "Unknown"
