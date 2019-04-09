@@ -1,11 +1,14 @@
 package main
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,14 +17,16 @@ import (
 
 // Result holds the results of the TLS end point
 type Result struct {
-	Address   string    `json:"address"`
-	Start     time.Time `json:"start"`
-	End       time.Time `json:"end"`
-	ValidHost bool      `json:"validHostname" yaml:"validHostname"`
-	Expired   bool      `json:"expired"`
-	Version   string    `json:"version"`
-	Cipher    string    `json:"cipher"`
-	Error     error     `json:"error"`
+	Address           string    `json:"address"`
+	Start             time.Time `json:"start"`
+	End               time.Time `json:"end"`
+	ValidHost         bool      `json:"validHostname" yaml:"validHostname"`
+	Expired           bool      `json:"expired"`
+	Version           string    `json:"version"`
+	Cipher            string    `json:"cipher"`
+	SerialNumber      string    `json:"serialNumber" yaml:"serialNumber"`
+	SHA256Fingerprint string    `json:"sha256Fingerprint" yaml:"sha256Fingerprint"`
+	Error             error     `json:"error"`
 }
 
 // Results hold an array of Result structs. This is used for group activities like exporting to json.
@@ -31,16 +36,18 @@ func (r Results) String() {
 	for _, res := range r {
 		fmt.Printf("%s\n", res.Address)
 		if res.Expired {
-			color.Red("  Expired:\t%v\n", res.Expired)
+			color.Red("  Expired:\t\t%v\n", res.Expired)
 		} else {
-			color.Green("  Expired:\t%v\n", res.Expired)
+			color.Green("  Expired:\t\t%v\n", res.Expired)
 		}
 
-		fmt.Printf("  Start:\t%v\n", res.Start)
-		fmt.Printf("  End:\t\t%v\n", res.End)
-		fmt.Printf("  Valid Host:\t%v\n", res.ValidHost)
-		fmt.Printf("  Version:\t%v\n", res.Version)
-		fmt.Printf("  Cipher Suite:\t%v\n", res.Cipher)
+		fmt.Printf("  Start:\t\t%v\n", res.Start)
+		fmt.Printf("  End:\t\t\t%v\n", res.End)
+		fmt.Printf("  Valid Host:\t\t%v\n", res.ValidHost)
+		fmt.Printf("  Version:\t\t%v\n", res.Version)
+		fmt.Printf("  Cipher Suite:\t\t%v\n", res.Cipher)
+		fmt.Printf("  Serial Number:\t%s\n", res.SerialNumber)
+		fmt.Printf("  SHA256 Fingerprint:\t%s\n", res.SHA256Fingerprint)
 	}
 
 }
@@ -114,8 +121,33 @@ func exec(addr string) *Result {
 	result.End = certEnd(state.PeerCertificates)
 	result.ValidHost = validHostname(host, state.PeerCertificates)
 	result.Expired = expired(result.Start, result.End)
+	result.SerialNumber = serialNumberS(state.PeerCertificates[0])
+	result.SHA256Fingerprint = sha256Fingerprint(state.PeerCertificates[0])
 
 	return result
+}
+
+// Returns the serial number of the last cert as a string
+func serialNumberS(cert *x509.Certificate) string {
+	serial := cert.SerialNumber
+	b := serial.Bytes()
+	return hexEncode(b)
+}
+
+func sha256Fingerprint(cert *x509.Certificate) string {
+	h := sha256.New()
+	h.Write(cert.Raw)
+	return hexEncode(h.Sum(nil))
+}
+
+func hexEncode(b []byte) string {
+	buf := make([]byte, 0, 3*len(b))
+	x := buf[1*len(b) : 3*len(b)]
+	hex.Encode(x, b)
+	for i := 0; i < len(x); i += 2 {
+		buf = append(buf, x[i], x[i+1], ' ')
+	}
+	return strings.ToUpper(string(buf[:len(buf)-1]))
 }
 
 func validHostname(host string, certs []*x509.Certificate) bool {
