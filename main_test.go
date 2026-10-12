@@ -231,12 +231,17 @@ func TestExecHandshakeTimeout(t *testing.T) {
 	}()
 
 	setDialTimeout(t, 200*time.Millisecond)
-	start := time.Now()
-	res := exec(ln.Addr().String())
-	if res.Error == nil {
-		t.Fatal("exec() against a silent server: expected a timeout error")
-	}
-	if elapsed := time.Since(start); elapsed > 5*time.Second {
-		t.Errorf("exec() took %v, want it bounded by dialTimeout", elapsed)
+	resc := make(chan *Result, 1)
+	go func() { resc <- exec(ln.Addr().String()) }()
+
+	// Fail cleanly rather than hanging the whole test run if the timeout
+	// stops being applied.
+	select {
+	case res := <-resc:
+		if res.Error == nil {
+			t.Fatal("exec() against a silent server: expected a timeout error")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("exec() did not return; dialTimeout is not being applied")
 	}
 }
