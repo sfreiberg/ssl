@@ -1,3 +1,7 @@
+// Accept SHA-1 signatures in TLS 1.2 handshakes (disabled by default since
+// Go 1.25) so servers that only support them can still be inspected.
+//go:debug tlssha1=1
+
 package main
 
 import (
@@ -15,21 +19,24 @@ import (
 	"github.com/fatih/color"
 )
 
-// Result holds the results of the TLS end point
+// dialTimeout bounds the TCP connect and TLS handshake for each address.
+var dialTimeout = 10 * time.Second
+
+// Result holds what was learned about a single TLS endpoint.
 type Result struct {
 	Address           string    `json:"address"`
 	Start             time.Time `json:"start"`
 	End               time.Time `json:"end"`
-	ValidHost         bool      `json:"validHostname" yaml:"validHostname"`
+	ValidHost         bool      `json:"validHostname"`
 	Expired           bool      `json:"expired"`
 	Version           string    `json:"version"`
 	Cipher            string    `json:"cipher"`
-	SerialNumber      string    `json:"serialNumber" yaml:"serialNumber"`
-	SHA256Fingerprint string    `json:"sha256Fingerprint" yaml:"sha256Fingerprint"`
+	SerialNumber      string    `json:"serialNumber"`
+	SHA256Fingerprint string    `json:"sha256Fingerprint"`
 	Error             error     `json:"error"`
 }
 
-// Results hold an array of Result structs. This is used for group activities like exporting to json.
+// Results holds the Result for each address that was checked.
 type Results []*Result
 
 func (r Results) String() {
@@ -64,21 +71,20 @@ func main() {
 	results.String()
 }
 
+// getResults checks each address concurrently and returns the results in
+// the same order as addresses.
 func getResults(addresses ...string) Results {
-	results := Results{}
-	mtx := &sync.Mutex{}
+	results := make(Results, len(addresses))
 	wg := &sync.WaitGroup{}
 
-	for _, addr := range addresses {
+	for i, addr := range addresses {
 		wg.Add(1)
 
-		go func(address string) {
-			result := exec(address)
-			mtx.Lock()
-			results = append(results, result)
-			mtx.Unlock()
-			wg.Done()
-		}(addr)
+		go func(i int, address string) {
+			defer wg.Done()
+			// Each goroutine writes only its own index, so no lock is needed.
+			results[i] = exec(address)
+		}(i, addr)
 	}
 
 	wg.Wait()
@@ -86,21 +92,33 @@ func getResults(addresses ...string) Results {
 	return results
 }
 
+// allCipherSuites returns every cipher suite Go implements, including the
+// insecure ones, so legacy servers can still be inspected. The TLS 1.3 suites
+// in the list are ignored by crypto/tls; they are not configurable and are
+// always enabled.
+func allCipherSuites() []uint16 {
+	var ids []uint16
+	for _, s := range tls.CipherSuites() {
+		ids = append(ids, s.ID)
+	}
+	for _, s := range tls.InsecureCipherSuites() {
+		ids = append(ids, s.ID)
+	}
+	return ids
+}
+
 func exec(addr string) *Result {
-	config := &tls.Config{InsecureSkipVerify: true}
+	config := &tls.Config{
+		InsecureSkipVerify: true,
+		MinVersion:         tls.VersionTLS10,
+		CipherSuites:       allCipherSuites(),
+	}
 	result := &Result{}
 
-	host, port, err := net.SplitHostPort(addr)
-	// If there's an error we're going to assume it's because
-	// there's no port and we'll add a port.
-	if err != nil {
-		host = addr
-		port = "443"
-		addr = net.JoinHostPort(host, port)
-	}
+	host, addr := splitAddr(addr)
 	result.Address = addr
 
-	conn, err := tls.Dial("tcp", addr, config)
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: dialTimeout}, "tcp", addr, config)
 	if err != nil {
 		result.Error = err
 		return result
@@ -121,10 +139,32 @@ func exec(addr string) *Result {
 	return result
 }
 
-// Returns the serial number of the last cert as a string
+// splitAddr returns the host to verify the certificate against and the
+// host:port to dial. If addr has no port, 443 is used. IPv6 literals may be
+// given with or without brackets, e.g. [::1], ::1 or [::1]:8443.
+func splitAddr(addr string) (host, hostport string) {
+	host, port, err := net.SplitHostPort(addr)
+	// If there's an error we're going to assume it's because
+	// there's no port and we'll add a port.
+	if err != nil {
+		host = addr
+		if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+			host = host[1 : len(host)-1]
+		}
+		port = "443"
+	}
+
+	return host, net.JoinHostPort(host, port)
+}
+
+// serialNumberS returns the certificate's serial number as hex bytes.
 func serialNumberS(cert *x509.Certificate) string {
 	serial := cert.SerialNumber
 	b := serial.Bytes()
+	if len(b) == 0 {
+		// A zero serial has no bytes; show it as a single zero byte.
+		b = []byte{0}
+	}
 	return hexEncode(b)
 }
 
@@ -135,6 +175,9 @@ func sha256Fingerprint(cert *x509.Certificate) string {
 }
 
 func hexEncode(b []byte) string {
+	if len(b) == 0 {
+		return ""
+	}
 	buf := make([]byte, 0, 3*len(b))
 	x := buf[1*len(b) : 3*len(b)]
 	hex.Encode(x, b)
@@ -208,7 +251,7 @@ func cipherS(cipher uint16) string {
 	case tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256:
 		return "ECDHE_RSA/AES_128_CBC/SHA256"
 	case tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:
-		return "ECDHE_RSA/AES_128_GCM/SHA"
+		return "ECDHE_RSA/AES_128_GCM/SHA256"
 	case tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:
 		return "ECDHE_ECDSA/AES_128_GCM/SHA256"
 	case tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384:
@@ -216,9 +259,9 @@ func cipherS(cipher uint16) string {
 	case tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:
 		return "ECDHE_ECDSA/AES_256_GCM/SHA384"
 	case tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305:
-		return "ECDHE_RSA/CHACHA20/POLY1305"
+		return "ECDHE_RSA/CHACHA20/POLY1305/SHA256"
 	case tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305:
-		return "ECDHE_ECDSA/CHACHA20/POLY1305"
+		return "ECDHE_ECDSA/CHACHA20/POLY1305/SHA256"
 	// TLS 1.3 cipher suites
 	case tls.TLS_AES_128_GCM_SHA256:
 		return "AES_128_GCM/SHA256"
