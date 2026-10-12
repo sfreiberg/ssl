@@ -209,24 +209,26 @@ func TestExecConnectionError(t *testing.T) {
 }
 
 func TestGetResults(t *testing.T) {
-	a, b := newTLSServer(t), newTLSServer(t)
-	addrs := []string{a.Listener.Addr().String(), b.Listener.Addr().String()}
-
-	results := getResults(addrs...)
-	if len(results) != len(addrs) {
-		t.Fatalf("getResults() returned %d results, want %d", len(results), len(addrs))
+	var addrs []string
+	for i := 0; i < 5; i++ {
+		addrs = append(addrs, newTLSServer(t).Listener.Addr().String())
 	}
 
-	seen := map[string]bool{}
-	for _, res := range results {
-		if res.Error != nil {
-			t.Errorf("%s: unexpected error: %v", res.Address, res.Error)
+	// Results must come back in argument order regardless of which
+	// connection finishes first.
+	for run := 0; run < 10; run++ {
+		results := getResults(addrs...)
+		if len(results) != len(addrs) {
+			t.Fatalf("getResults() returned %d results, want %d", len(results), len(addrs))
 		}
-		seen[res.Address] = true
-	}
-	for _, addr := range addrs {
-		if !seen[addr] {
-			t.Errorf("missing result for %s", addr)
+
+		for i, res := range results {
+			if res.Error != nil {
+				t.Errorf("%s: unexpected error: %v", res.Address, res.Error)
+			}
+			if res.Address != addrs[i] {
+				t.Fatalf("results[%d].Address = %q, want %q", i, res.Address, addrs[i])
+			}
 		}
 	}
 }
