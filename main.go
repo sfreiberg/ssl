@@ -74,9 +74,9 @@ func getResults(addresses ...string) Results {
 		wg.Add(1)
 
 		go func(i int, address string) {
+			defer wg.Done()
 			// Each goroutine writes only its own index, so no lock is needed.
 			results[i] = exec(address)
-			wg.Done()
 		}(i, addr)
 	}
 
