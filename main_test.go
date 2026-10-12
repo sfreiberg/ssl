@@ -201,3 +201,40 @@ func TestGetResults(t *testing.T) {
 		}
 	}
 }
+
+func TestExecLegacyServer(t *testing.T) {
+	tests := []struct {
+		name    string
+		version uint16
+		cipher  uint16
+		want    string
+	}{
+		{"RSA key exchange", tls.VersionTLS12, tls.TLS_RSA_WITH_AES_128_GCM_SHA256, "RSA/AES_128_GCM/SHA256"},
+		{"3DES", tls.VersionTLS12, tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA, "ECDHE_RSA/3DES_EDE_CBC/SHA"},
+		{"TLS 1.0", tls.VersionTLS10, tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, "ECDHE_RSA/AES_128_CBC/SHA"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewUnstartedServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+			srv.TLS = &tls.Config{
+				MinVersion:   tt.version,
+				MaxVersion:   tt.version,
+				CipherSuites: []uint16{tt.cipher},
+			}
+			srv.StartTLS()
+			t.Cleanup(srv.Close)
+
+			res := exec(srv.Listener.Addr().String())
+			if res.Error != nil {
+				t.Fatalf("exec() error: %v", res.Error)
+			}
+			if res.Cipher != tt.want {
+				t.Errorf("Cipher = %q, want %q", res.Cipher, tt.want)
+			}
+			if want := sslVersionS(tt.version); res.Version != want {
+				t.Errorf("Version = %q, want %q", res.Version, want)
+			}
+		})
+	}
+}
