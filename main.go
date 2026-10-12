@@ -20,16 +20,16 @@ type Result struct {
 	Address           string    `json:"address"`
 	Start             time.Time `json:"start"`
 	End               time.Time `json:"end"`
-	ValidHost         bool      `json:"validHostname" yaml:"validHostname"`
+	ValidHost         bool      `json:"validHostname"`
 	Expired           bool      `json:"expired"`
 	Version           string    `json:"version"`
 	Cipher            string    `json:"cipher"`
-	SerialNumber      string    `json:"serialNumber" yaml:"serialNumber"`
-	SHA256Fingerprint string    `json:"sha256Fingerprint" yaml:"sha256Fingerprint"`
+	SerialNumber      string    `json:"serialNumber"`
+	SHA256Fingerprint string    `json:"sha256Fingerprint"`
 	Error             error     `json:"error"`
 }
 
-// Results hold an array of Result structs. This is used for group activities like exporting to json.
+// Results holds the Result for each address that was checked.
 type Results []*Result
 
 func (r Results) String() {
