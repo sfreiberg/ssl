@@ -64,21 +64,20 @@ func main() {
 	results.String()
 }
 
+// getResults checks each address concurrently and returns the results in
+// the same order as addresses.
 func getResults(addresses ...string) Results {
-	results := Results{}
-	mtx := &sync.Mutex{}
+	results := make(Results, len(addresses))
 	wg := &sync.WaitGroup{}
 
-	for _, addr := range addresses {
+	for i, addr := range addresses {
 		wg.Add(1)
 
-		go func(address string) {
-			result := exec(address)
-			mtx.Lock()
-			results = append(results, result)
-			mtx.Unlock()
+		go func(i int, address string) {
+			// Each goroutine writes only its own index, so no lock is needed.
+			results[i] = exec(address)
 			wg.Done()
-		}(addr)
+		}(i, addr)
 	}
 
 	wg.Wait()
