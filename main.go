@@ -125,6 +125,10 @@ func exec(addr string) *Result {
 func serialNumberS(cert *x509.Certificate) string {
 	serial := cert.SerialNumber
 	b := serial.Bytes()
+	if len(b) == 0 {
+		// A zero serial has no bytes; show it as a single zero byte.
+		b = []byte{0}
+	}
 	return hexEncode(b)
 }
 
@@ -135,6 +139,9 @@ func sha256Fingerprint(cert *x509.Certificate) string {
 }
 
 func hexEncode(b []byte) string {
+	if len(b) == 0 {
+		return ""
+	}
 	buf := make([]byte, 0, 3*len(b))
 	x := buf[1*len(b) : 3*len(b)]
 	hex.Encode(x, b)

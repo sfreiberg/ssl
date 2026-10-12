@@ -92,15 +92,30 @@ func TestCertStartEnd(t *testing.T) {
 }
 
 func TestHexEncode(t *testing.T) {
-	if got, want := hexEncode([]byte{0x01, 0xab, 0xff}), "01 AB FF"; got != want {
-		t.Errorf("hexEncode() = %q, want %q", got, want)
+	tests := map[string][]byte{
+		"01 AB FF": {0x01, 0xab, 0xff},
+		"0A":       {0x0a},
+		"":         {},
+	}
+
+	for want, b := range tests {
+		if got := hexEncode(b); got != want {
+			t.Errorf("hexEncode(%v) = %q, want %q", b, got, want)
+		}
 	}
 }
 
 func TestSerialNumberS(t *testing.T) {
-	cert := &x509.Certificate{SerialNumber: big.NewInt(0x0a0b0c)}
-	if got, want := serialNumberS(cert), "0A 0B 0C"; got != want {
-		t.Errorf("serialNumberS() = %q, want %q", got, want)
+	tests := map[int64]string{
+		0x0a0b0c: "0A 0B 0C",
+		0:        "00",
+	}
+
+	for serial, want := range tests {
+		cert := &x509.Certificate{SerialNumber: big.NewInt(serial)}
+		if got := serialNumberS(cert); got != want {
+			t.Errorf("serialNumberS(%#x) = %q, want %q", serial, got, want)
+		}
 	}
 }
 
