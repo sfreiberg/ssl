@@ -173,6 +173,12 @@ func TestSplitAddr(t *testing.T) {
 		{"::1", "::1", "[::1]:443"},
 		{"[::1]:8443", "::1", "[::1]:8443"},
 		{"[2001:db8::1]", "2001:db8::1", "[2001:db8::1]:443"},
+		{"[fe80::1%en0]", "fe80::1%en0", "[fe80::1%en0]:443"},
+		{"fe80::1%en0", "fe80::1%en0", "[fe80::1%en0]:443"},
+		// Unbalanced brackets are left alone so the dial fails rather than
+		// silently "fixing" a typo.
+		{"[::1", "[::1", "[[::1]:443"},
+		{"::1]", "::1]", "[::1]]:443"},
 	}
 
 	for _, tt := range tests {

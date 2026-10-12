@@ -122,7 +122,10 @@ func splitAddr(addr string) (host, hostport string) {
 	// If there's an error we're going to assume it's because
 	// there's no port and we'll add a port.
 	if err != nil {
-		host = strings.TrimSuffix(strings.TrimPrefix(addr, "["), "]")
+		host = addr
+		if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+			host = host[1 : len(host)-1]
+		}
 		port = "443"
 	}
 
