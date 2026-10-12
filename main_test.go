@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -161,9 +162,19 @@ func TestExec(t *testing.T) {
 	}
 }
 
+// setDialTimeout shortens dialTimeout for the duration of a test.
+func setDialTimeout(t *testing.T, d time.Duration) {
+	t.Helper()
+	orig := dialTimeout
+	dialTimeout = d
+	t.Cleanup(func() { dialTimeout = orig })
+}
+
 func TestExecDefaultPort(t *testing.T) {
-	// An address without a port should default to 443. Loopback either
-	// connects or is refused immediately; only the address matters here.
+	// An address without a port should default to 443. Only the address
+	// matters here; the short timeout keeps a silent listener on the test
+	// machine's port 443 from stalling the test.
+	setDialTimeout(t, 500*time.Millisecond)
 	if res := exec("127.0.0.1"); res.Address != "127.0.0.1:443" {
 		t.Errorf("Address = %q, want %q", res.Address, "127.0.0.1:443")
 	}
@@ -199,5 +210,33 @@ func TestGetResults(t *testing.T) {
 		if !seen[addr] {
 			t.Errorf("missing result for %s", addr)
 		}
+	}
+}
+
+func TestExecHandshakeTimeout(t *testing.T) {
+	// A server that accepts TCP connections but never speaks TLS.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	t.Cleanup(func() { close(done); ln.Close() })
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		<-done
+		conn.Close()
+	}()
+
+	setDialTimeout(t, 200*time.Millisecond)
+	start := time.Now()
+	res := exec(ln.Addr().String())
+	if res.Error == nil {
+		t.Fatal("exec() against a silent server: expected a timeout error")
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Errorf("exec() took %v, want it bounded by dialTimeout", elapsed)
 	}
 }

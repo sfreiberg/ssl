@@ -15,6 +15,9 @@ import (
 	"github.com/fatih/color"
 )
 
+// dialTimeout bounds the TCP connect and TLS handshake for each address.
+var dialTimeout = 10 * time.Second
+
 // Result holds the results of the TLS end point
 type Result struct {
 	Address           string    `json:"address"`
@@ -100,7 +103,7 @@ func exec(addr string) *Result {
 	}
 	result.Address = addr
 
-	conn, err := tls.Dial("tcp", addr, config)
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: dialTimeout}, "tcp", addr, config)
 	if err != nil {
 		result.Error = err
 		return result
