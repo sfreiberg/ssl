@@ -15,9 +15,12 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      # Build releases with the latest patched Go rather than the minimum
+      # version in go.mod, so binaries get current crypto/tls and x509 fixes.
       - uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: stable
+          check-latest: true
       - name: Test
         run: go test ./...
       - uses: goreleaser/goreleaser-action@v7
