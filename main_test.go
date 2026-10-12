@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/fatih/color"
 )
 
 func TestSSLVersionS(t *testing.T) {
@@ -263,5 +266,41 @@ func TestExecHandshakeTimeout(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("exec() did not return; dialTimeout is not being applied")
+	}
+}
+
+func TestResultsFprint(t *testing.T) {
+	orig := color.NoColor
+	color.NoColor = true
+	t.Cleanup(func() { color.NoColor = orig })
+
+	srv := newTLSServer(t)
+	closed := newTLSServer(t)
+	closedAddr := closed.Listener.Addr().String()
+	closed.Close()
+
+	results := getResults(srv.Listener.Addr().String(), closedAddr)
+	var buf bytes.Buffer
+	results.Fprint(&buf)
+	out := buf.String()
+
+	// The failed address shows its error and none of the empty fields.
+	failed := out[strings.Index(out, closedAddr+"\n"):]
+	if !strings.Contains(failed, "Error:") || !strings.Contains(failed, results[1].Error.Error()) {
+		t.Errorf("output for %s is missing the error:\n%s", closedAddr, failed)
+	}
+	if strings.Contains(failed, "Start:") {
+		t.Errorf("output for %s should not show certificate fields:\n%s", closedAddr, failed)
+	}
+
+	// The working address still shows its details and no error.
+	ok := out[:strings.Index(out, closedAddr+"\n")]
+	for _, field := range []string{"Expired:", "Version:\t\tTLS 1.3", "SHA256 Fingerprint:"} {
+		if !strings.Contains(ok, field) {
+			t.Errorf("output for the working server is missing %q:\n%s", field, ok)
+		}
+	}
+	if strings.Contains(ok, "Error:") {
+		t.Errorf("output for the working server should not show an error:\n%s", ok)
 	}
 }
