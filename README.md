@@ -20,19 +20,23 @@ git push origin v1.3.0
 ```bash
 $ ssl google.com gmail.com
 google.com:443
-  Expired:	false
-  Start:	2019-03-01 09:43:57 +0000 UTC
-  End:		2019-05-24 09:25:00 +0000 UTC
-  Valid Host:	true
-  Version:	TLS 3.0
-  Cipher Suite:	ECDHE_ECDSA/AES_128_GCM/SHA256
+  Expired:		false
+  Start:		2026-09-18 20:00:19 +0000 UTC
+  End:			2026-12-11 20:00:18 +0000 UTC
+  Valid Host:		true
+  Version:		TLS 1.3
+  Cipher Suite:		AES_128_GCM/SHA256
+  Serial Number:	95 83 99 D5 1C BB B9 0E 0A 02 7A CB A3 D2 42 ED
+  SHA256 Fingerprint:	C0 C4 49 95 A7 12 E9 78 CF 5D DE 65 3D C0 D4 81 64 D4 96 1C EA 25 ED 73 45 40 06 1A C5 E8 0F 48
 gmail.com:443
-  Expired:	false
-  Start:	2019-03-01 09:28:34 +0000 UTC
-  End:		2019-05-24 09:24:00 +0000 UTC
-  Valid Host:	true
-  Version:	TLS 3.0
-  Cipher Suite:	ECDHE_RSA/AES_128_GCM/SHA256
+  Expired:		false
+  Start:		2026-09-18 20:01:45 +0000 UTC
+  End:			2026-12-11 20:01:44 +0000 UTC
+  Valid Host:		true
+  Version:		TLS 1.3
+  Cipher Suite:		AES_128_GCM/SHA256
+  Serial Number:	44 15 D7 6F 46 E0 96 E3 0A 08 4D CF FD 8E EF 42
+  SHA256 Fingerprint:	B9 31 DD 41 DB 79 AB 6A 4B C8 64 AC 9E 78 AB AD C2 EE 78 AD 1F 0F 4E BA 6A E7 8A 1C D9 3C CE 20
 ```
 
 ## Limitations
