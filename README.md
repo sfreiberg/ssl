@@ -32,7 +32,7 @@ gmail.com:443
   End:		2019-05-24 09:24:00 +0000 UTC
   Valid Host:	true
   Version:	TLS 3.0
-  Cipher Suite:	ECDHE_RSA/AES_128_GCM/SHA
+  Cipher Suite:	ECDHE_RSA/AES_128_GCM/SHA256
 ```
 
 ## Limitations
