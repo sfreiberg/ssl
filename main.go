@@ -19,6 +19,9 @@ import (
 	"github.com/fatih/color"
 )
 
+// dialTimeout bounds the TCP connect and TLS handshake for each address.
+var dialTimeout = 10 * time.Second
+
 // Result holds the results of the TLS end point
 type Result struct {
 	Address           string    `json:"address"`
@@ -68,21 +71,20 @@ func main() {
 	results.String()
 }
 
+// getResults checks each address concurrently and returns the results in
+// the same order as addresses.
 func getResults(addresses ...string) Results {
-	results := Results{}
-	mtx := &sync.Mutex{}
+	results := make(Results, len(addresses))
 	wg := &sync.WaitGroup{}
 
-	for _, addr := range addresses {
+	for i, addr := range addresses {
 		wg.Add(1)
 
-		go func(address string) {
-			result := exec(address)
-			mtx.Lock()
-			results = append(results, result)
-			mtx.Unlock()
-			wg.Done()
-		}(addr)
+		go func(i int, address string) {
+			defer wg.Done()
+			// Each goroutine writes only its own index, so no lock is needed.
+			results[i] = exec(address)
+		}(i, addr)
 	}
 
 	wg.Wait()
@@ -123,7 +125,7 @@ func exec(addr string) *Result {
 	}
 	result.Address = addr
 
-	conn, err := tls.Dial("tcp", addr, config)
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: dialTimeout}, "tcp", addr, config)
 	if err != nil {
 		result.Error = err
 		return result
@@ -144,10 +146,14 @@ func exec(addr string) *Result {
 	return result
 }
 
-// Returns the serial number of the last cert as a string
+// serialNumberS returns the certificate's serial number as hex bytes.
 func serialNumberS(cert *x509.Certificate) string {
 	serial := cert.SerialNumber
 	b := serial.Bytes()
+	if len(b) == 0 {
+		// A zero serial has no bytes; show it as a single zero byte.
+		b = []byte{0}
+	}
 	return hexEncode(b)
 }
 
@@ -158,6 +164,9 @@ func sha256Fingerprint(cert *x509.Certificate) string {
 }
 
 func hexEncode(b []byte) string {
+	if len(b) == 0 {
+		return ""
+	}
 	buf := make([]byte, 0, 3*len(b))
 	x := buf[1*len(b) : 3*len(b)]
 	hex.Encode(x, b)
@@ -231,7 +240,7 @@ func cipherS(cipher uint16) string {
 	case tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256:
 		return "ECDHE_RSA/AES_128_CBC/SHA256"
 	case tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:
-		return "ECDHE_RSA/AES_128_GCM/SHA"
+		return "ECDHE_RSA/AES_128_GCM/SHA256"
 	case tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:
 		return "ECDHE_ECDSA/AES_128_GCM/SHA256"
 	case tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384:
@@ -239,9 +248,9 @@ func cipherS(cipher uint16) string {
 	case tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:
 		return "ECDHE_ECDSA/AES_256_GCM/SHA384"
 	case tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305:
-		return "ECDHE_RSA/CHACHA20/POLY1305"
+		return "ECDHE_RSA/CHACHA20/POLY1305/SHA256"
 	case tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305:
-		return "ECDHE_ECDSA/CHACHA20/POLY1305"
+		return "ECDHE_ECDSA/CHACHA20/POLY1305/SHA256"
 	// TLS 1.3 cipher suites
 	case tls.TLS_AES_128_GCM_SHA256:
 		return "AES_128_GCM/SHA256"

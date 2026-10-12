@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,7 +34,10 @@ func TestCipherS(t *testing.T) {
 		tls.TLS_AES_128_GCM_SHA256:                  "AES_128_GCM/SHA256",
 		tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384: "ECDHE_ECDSA/AES_256_GCM/SHA384",
 		tls.TLS_RSA_WITH_AES_128_CBC_SHA:            "RSA/AES_128_CBC/SHA",
-		0:                                           "Unknown",
+		tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:   "ECDHE_RSA/AES_128_GCM/SHA256",
+		tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305:    "ECDHE_RSA/CHACHA20/POLY1305/SHA256",
+		tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305:  "ECDHE_ECDSA/CHACHA20/POLY1305/SHA256",
+		0: "Unknown",
 	}
 
 	for cipher, want := range tests {
@@ -92,15 +96,30 @@ func TestCertStartEnd(t *testing.T) {
 }
 
 func TestHexEncode(t *testing.T) {
-	if got, want := hexEncode([]byte{0x01, 0xab, 0xff}), "01 AB FF"; got != want {
-		t.Errorf("hexEncode() = %q, want %q", got, want)
+	tests := map[string][]byte{
+		"01 AB FF": {0x01, 0xab, 0xff},
+		"0A":       {0x0a},
+		"":         {},
+	}
+
+	for want, b := range tests {
+		if got := hexEncode(b); got != want {
+			t.Errorf("hexEncode(%v) = %q, want %q", b, got, want)
+		}
 	}
 }
 
 func TestSerialNumberS(t *testing.T) {
-	cert := &x509.Certificate{SerialNumber: big.NewInt(0x0a0b0c)}
-	if got, want := serialNumberS(cert), "0A 0B 0C"; got != want {
-		t.Errorf("serialNumberS() = %q, want %q", got, want)
+	tests := map[int64]string{
+		0x0a0b0c: "0A 0B 0C",
+		0:        "00",
+	}
+
+	for serial, want := range tests {
+		cert := &x509.Certificate{SerialNumber: big.NewInt(serial)}
+		if got := serialNumberS(cert); got != want {
+			t.Errorf("serialNumberS(%#x) = %q, want %q", serial, got, want)
+		}
 	}
 }
 
@@ -161,9 +180,19 @@ func TestExec(t *testing.T) {
 	}
 }
 
+// setDialTimeout shortens dialTimeout for the duration of a test.
+func setDialTimeout(t *testing.T, d time.Duration) {
+	t.Helper()
+	orig := dialTimeout
+	dialTimeout = d
+	t.Cleanup(func() { dialTimeout = orig })
+}
+
 func TestExecDefaultPort(t *testing.T) {
-	// An address without a port should default to 443. Loopback either
-	// connects or is refused immediately; only the address matters here.
+	// An address without a port should default to 443. Only the address
+	// matters here; the short timeout keeps a silent listener on the test
+	// machine's port 443 from stalling the test.
+	setDialTimeout(t, 500*time.Millisecond)
 	if res := exec("127.0.0.1"); res.Address != "127.0.0.1:443" {
 		t.Errorf("Address = %q, want %q", res.Address, "127.0.0.1:443")
 	}
@@ -180,24 +209,26 @@ func TestExecConnectionError(t *testing.T) {
 }
 
 func TestGetResults(t *testing.T) {
-	a, b := newTLSServer(t), newTLSServer(t)
-	addrs := []string{a.Listener.Addr().String(), b.Listener.Addr().String()}
-
-	results := getResults(addrs...)
-	if len(results) != len(addrs) {
-		t.Fatalf("getResults() returned %d results, want %d", len(results), len(addrs))
+	var addrs []string
+	for i := 0; i < 5; i++ {
+		addrs = append(addrs, newTLSServer(t).Listener.Addr().String())
 	}
 
-	seen := map[string]bool{}
-	for _, res := range results {
-		if res.Error != nil {
-			t.Errorf("%s: unexpected error: %v", res.Address, res.Error)
+	// Results must come back in argument order regardless of which
+	// connection finishes first.
+	for run := 0; run < 10; run++ {
+		results := getResults(addrs...)
+		if len(results) != len(addrs) {
+			t.Fatalf("getResults() returned %d results, want %d", len(results), len(addrs))
 		}
-		seen[res.Address] = true
-	}
-	for _, addr := range addrs {
-		if !seen[addr] {
-			t.Errorf("missing result for %s", addr)
+
+		for i, res := range results {
+			if res.Error != nil {
+				t.Errorf("%s: unexpected error: %v", res.Address, res.Error)
+			}
+			if res.Address != addrs[i] {
+				t.Fatalf("results[%d].Address = %q, want %q", i, res.Address, addrs[i])
+			}
 		}
 	}
 }
@@ -236,5 +267,38 @@ func TestExecLegacyServer(t *testing.T) {
 				t.Errorf("Version = %q, want %q", res.Version, want)
 			}
 		})
+	}
+}
+
+func TestExecHandshakeTimeout(t *testing.T) {
+	// A server that accepts TCP connections but never speaks TLS.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	t.Cleanup(func() { close(done); ln.Close() })
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		<-done
+		conn.Close()
+	}()
+
+	setDialTimeout(t, 200*time.Millisecond)
+	resc := make(chan *Result, 1)
+	go func() { resc <- exec(ln.Addr().String()) }()
+
+	// Fail cleanly rather than hanging the whole test run if the timeout
+	// stops being applied.
+	select {
+	case res := <-resc:
+		if res.Error == nil {
+			t.Fatal("exec() against a silent server: expected a timeout error")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("exec() did not return; dialTimeout is not being applied")
 	}
 }
