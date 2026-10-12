@@ -33,7 +33,10 @@ func TestCipherS(t *testing.T) {
 		tls.TLS_AES_128_GCM_SHA256:                  "AES_128_GCM/SHA256",
 		tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384: "ECDHE_ECDSA/AES_256_GCM/SHA384",
 		tls.TLS_RSA_WITH_AES_128_CBC_SHA:            "RSA/AES_128_CBC/SHA",
-		0:                                           "Unknown",
+		tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:   "ECDHE_RSA/AES_128_GCM/SHA256",
+		tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305:    "ECDHE_RSA/CHACHA20/POLY1305/SHA256",
+		tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305:  "ECDHE_ECDSA/CHACHA20/POLY1305/SHA256",
+		0: "Unknown",
 	}
 
 	for cipher, want := range tests {
