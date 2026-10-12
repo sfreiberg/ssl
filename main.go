@@ -121,7 +121,7 @@ func exec(addr string) *Result {
 	return result
 }
 
-// Returns the serial number of the last cert as a string
+// serialNumberS returns the certificate's serial number as hex bytes.
 func serialNumberS(cert *x509.Certificate) string {
 	serial := cert.SerialNumber
 	b := serial.Bytes()
