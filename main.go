@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -40,23 +41,36 @@ type Result struct {
 type Results []*Result
 
 func (r Results) String() {
+	r.Fprint(color.Output)
+}
+
+// Fprint writes a human readable report for each result to w. Addresses that
+// could not be checked show the error instead of the certificate details.
+func (r Results) Fprint(w io.Writer) {
+	red := color.New(color.FgRed)
+	green := color.New(color.FgGreen)
+
 	for _, res := range r {
-		fmt.Printf("%s\n", res.Address)
-		if res.Expired {
-			color.Red("  Expired:\t\t%v\n", res.Expired)
-		} else {
-			color.Green("  Expired:\t\t%v\n", res.Expired)
+		fmt.Fprintf(w, "%s\n", res.Address)
+		if res.Error != nil {
+			red.Fprintf(w, "  Error:\t\t%v\n", res.Error)
+			continue
 		}
 
-		fmt.Printf("  Start:\t\t%v\n", res.Start)
-		fmt.Printf("  End:\t\t\t%v\n", res.End)
-		fmt.Printf("  Valid Host:\t\t%v\n", res.ValidHost)
-		fmt.Printf("  Version:\t\t%v\n", res.Version)
-		fmt.Printf("  Cipher Suite:\t\t%v\n", res.Cipher)
-		fmt.Printf("  Serial Number:\t%s\n", res.SerialNumber)
-		fmt.Printf("  SHA256 Fingerprint:\t%s\n", res.SHA256Fingerprint)
-	}
+		if res.Expired {
+			red.Fprintf(w, "  Expired:\t\t%v\n", res.Expired)
+		} else {
+			green.Fprintf(w, "  Expired:\t\t%v\n", res.Expired)
+		}
 
+		fmt.Fprintf(w, "  Start:\t\t%v\n", res.Start)
+		fmt.Fprintf(w, "  End:\t\t\t%v\n", res.End)
+		fmt.Fprintf(w, "  Valid Host:\t\t%v\n", res.ValidHost)
+		fmt.Fprintf(w, "  Version:\t\t%v\n", res.Version)
+		fmt.Fprintf(w, "  Cipher Suite:\t\t%v\n", res.Cipher)
+		fmt.Fprintf(w, "  Serial Number:\t%s\n", res.SerialNumber)
+		fmt.Fprintf(w, "  SHA256 Fingerprint:\t%s\n", res.SHA256Fingerprint)
+	}
 }
 
 func main() {
