@@ -8,6 +8,13 @@ SSL is a simple command line utility to get common information from an SSL/TLS e
 
 Binary releases for common platforms are available on the Github [releases](https://github.com/sfreiberg/ssl/releases) page.
 
+New releases are built and published automatically by [GoReleaser](https://goreleaser.com) when a version tag is pushed:
+
+```bash
+git tag v1.3.0
+git push origin v1.3.0
+```
+
 ## Example
 
 ```bash
