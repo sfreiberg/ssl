@@ -15,7 +15,7 @@ import (
 	"github.com/fatih/color"
 )
 
-// Result holds the results of the TLS end point
+// Result holds what was learned about a single TLS endpoint.
 type Result struct {
 	Address           string    `json:"address"`
 	Start             time.Time `json:"start"`
