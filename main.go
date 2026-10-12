@@ -90,14 +90,7 @@ func exec(addr string) *Result {
 	config := &tls.Config{InsecureSkipVerify: true}
 	result := &Result{}
 
-	host, port, err := net.SplitHostPort(addr)
-	// If there's an error we're going to assume it's because
-	// there's no port and we'll add a port.
-	if err != nil {
-		host = addr
-		port = "443"
-		addr = net.JoinHostPort(host, port)
-	}
+	host, addr := splitAddr(addr)
 	result.Address = addr
 
 	conn, err := tls.Dial("tcp", addr, config)
@@ -119,6 +112,21 @@ func exec(addr string) *Result {
 	result.SHA256Fingerprint = sha256Fingerprint(state.PeerCertificates[0])
 
 	return result
+}
+
+// splitAddr returns the host to verify the certificate against and the
+// host:port to dial. If addr has no port, 443 is used. IPv6 literals may be
+// given with or without brackets, e.g. [::1], ::1 or [::1]:8443.
+func splitAddr(addr string) (host, hostport string) {
+	host, port, err := net.SplitHostPort(addr)
+	// If there's an error we're going to assume it's because
+	// there's no port and we'll add a port.
+	if err != nil {
+		host = strings.TrimSuffix(strings.TrimPrefix(addr, "["), "]")
+		port = "443"
+	}
+
+	return host, net.JoinHostPort(host, port)
 }
 
 // Returns the serial number of the last cert as a string

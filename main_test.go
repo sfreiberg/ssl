@@ -161,6 +161,28 @@ func TestExec(t *testing.T) {
 	}
 }
 
+func TestSplitAddr(t *testing.T) {
+	tests := []struct {
+		addr, host, hostport string
+	}{
+		{"example.com", "example.com", "example.com:443"},
+		{"example.com:8443", "example.com", "example.com:8443"},
+		{"127.0.0.1", "127.0.0.1", "127.0.0.1:443"},
+		{"127.0.0.1:993", "127.0.0.1", "127.0.0.1:993"},
+		{"[::1]", "::1", "[::1]:443"},
+		{"::1", "::1", "[::1]:443"},
+		{"[::1]:8443", "::1", "[::1]:8443"},
+		{"[2001:db8::1]", "2001:db8::1", "[2001:db8::1]:443"},
+	}
+
+	for _, tt := range tests {
+		host, hostport := splitAddr(tt.addr)
+		if host != tt.host || hostport != tt.hostport {
+			t.Errorf("splitAddr(%q) = %q, %q, want %q, %q", tt.addr, host, hostport, tt.host, tt.hostport)
+		}
+	}
+}
+
 func TestExecDefaultPort(t *testing.T) {
 	// An address without a port should default to 443. Loopback either
 	// connects or is refused immediately; only the address matters here.
