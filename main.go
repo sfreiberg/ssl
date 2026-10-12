@@ -1,3 +1,7 @@
+// Accept SHA-1 signatures in TLS 1.2 handshakes (disabled by default since
+// Go 1.25) so servers that only support them can still be inspected.
+//go:debug tlssha1=1
+
 package main
 
 import (
@@ -88,8 +92,27 @@ func getResults(addresses ...string) Results {
 	return results
 }
 
+// allCipherSuites returns every cipher suite Go implements, including the
+// insecure ones, so legacy servers can still be inspected. The TLS 1.3 suites
+// in the list are ignored by crypto/tls; they are not configurable and are
+// always enabled.
+func allCipherSuites() []uint16 {
+	var ids []uint16
+	for _, s := range tls.CipherSuites() {
+		ids = append(ids, s.ID)
+	}
+	for _, s := range tls.InsecureCipherSuites() {
+		ids = append(ids, s.ID)
+	}
+	return ids
+}
+
 func exec(addr string) *Result {
-	config := &tls.Config{InsecureSkipVerify: true}
+	config := &tls.Config{
+		InsecureSkipVerify: true,
+		MinVersion:         tls.VersionTLS10,
+		CipherSuites:       allCipherSuites(),
+	}
 	result := &Result{}
 
 	host, addr := splitAddr(addr)
