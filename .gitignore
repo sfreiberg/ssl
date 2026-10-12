@@ -1,3 +1,4 @@
 dist/
 ssl_*
 /ssl
+/ssl.exe

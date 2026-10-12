@@ -15,6 +15,8 @@ git tag v1.3.0
 git push origin v1.3.0
 ```
 
+To build locally, run `go build`. To cross-compile every release target without publishing, run `goreleaser build --snapshot --clean`; binaries are written to `dist/`.
+
 ## Example
 
 ```bash
