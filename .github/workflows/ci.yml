@@ -25,6 +25,8 @@ jobs:
             gofmt -d .
             exit 1
           fi
+      - name: Modernize
+        run: go run golang.org/x/tools/go/analysis/passes/modernize/cmd/modernize@v0.52.0 -test ./...
 
   test:
     strategy:

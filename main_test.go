@@ -241,13 +241,13 @@ func TestExecConnectionError(t *testing.T) {
 
 func TestGetResults(t *testing.T) {
 	var addrs []string
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		addrs = append(addrs, newTLSServer(t).Listener.Addr().String())
 	}
 
 	// Results must come back in argument order regardless of which
 	// connection finishes first.
-	for run := 0; run < 10; run++ {
+	for range 10 {
 		results := getResults(addrs...)
 		if len(results) != len(addrs) {
 			t.Fatalf("getResults() returned %d results, want %d", len(results), len(addrs))
