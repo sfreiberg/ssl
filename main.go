@@ -201,15 +201,14 @@ func hexEncode(b []byte) string {
 	return strings.ToUpper(string(buf[:len(buf)-1]))
 }
 
+// validHostname reports whether the leaf certificate is valid for host. Only
+// the leaf (the first certificate) identifies the server; names on
+// intermediate or root certificates don't count.
 func validHostname(host string, certs []*x509.Certificate) bool {
-	for _, cert := range certs {
-		err := cert.VerifyHostname(host)
-		if err == nil {
-			return true
-		}
+	if len(certs) == 0 {
+		return false
 	}
-
-	return false
+	return certs[0].VerifyHostname(host) == nil
 }
 
 func sslVersionS(ver uint16) string {

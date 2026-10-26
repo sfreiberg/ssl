@@ -98,6 +98,31 @@ func TestCertStartEnd(t *testing.T) {
 	}
 }
 
+func TestValidHostname(t *testing.T) {
+	leaf := &x509.Certificate{DNSNames: []string{"example.com"}}
+	other := &x509.Certificate{DNSNames: []string{"other.example"}}
+
+	tests := []struct {
+		name  string
+		host  string
+		certs []*x509.Certificate
+		want  bool
+	}{
+		{"leaf matches", "example.com", []*x509.Certificate{leaf, other}, true},
+		{"no match", "nope.example", []*x509.Certificate{leaf, other}, false},
+		// A name on a later certificate in the chain must not make the
+		// server's own certificate look valid.
+		{"only intermediate matches", "other.example", []*x509.Certificate{leaf, other}, false},
+		{"no certs", "example.com", nil, false},
+	}
+
+	for _, tt := range tests {
+		if got := validHostname(tt.host, tt.certs); got != tt.want {
+			t.Errorf("%s: validHostname(%q) = %v, want %v", tt.name, tt.host, got, tt.want)
+		}
+	}
+}
+
 func TestHexEncode(t *testing.T) {
 	tests := map[string][]byte{
 		"01 AB FF": {0x01, 0xab, 0xff},
